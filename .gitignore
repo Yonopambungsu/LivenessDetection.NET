@@ -62,10 +62,7 @@ bld/
 Generated\ Files/
 
 # AIModels
-AIModels/detection/*.onnx
-AIModels/landmark/*.onnx
-AIModels/recognition/*.onnx
-AIModels/spoof/*.onnx
+*.onnx
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
