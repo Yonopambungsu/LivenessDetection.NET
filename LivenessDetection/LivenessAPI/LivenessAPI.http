@@ -1,0 +1,23 @@
+@LivenessAPI_HostAddress = http://localhost:5038
+
+### Start a session (replace with a real base64 JPEG/PNG of a face)
+POST {{LivenessAPI_HostAddress}}/api/liveness/session/start
+Content-Type: application/json
+
+{
+  "referenceImageBase64": "<base64-reference-photo>"
+}
+
+### Submit a frame (use the sessionId returned above)
+POST {{LivenessAPI_HostAddress}}/api/liveness/session/{{sessionId}}/frame
+Content-Type: application/json
+
+{
+  "imageBase64": "<base64-camera-frame>"
+}
+
+### Check session status
+GET {{LivenessAPI_HostAddress}}/api/liveness/session/{{sessionId}}/status
+Accept: application/json
+
+###
