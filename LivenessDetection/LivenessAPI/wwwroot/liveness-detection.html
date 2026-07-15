@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demo Liveness Detection — Verifikasi Wajah AI Real-Time | Liveness Detection .NET</title>
+    <meta name="description" content="Coba demo liveness detection berbasis AI: verifikasi wajah real-time dengan deteksi kedipan mata, senyum, dan gerakan kepala untuk mencegah spoofing foto atau video." />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <style>
+        :root {
+            --bg: #0f1115;
+            --panel: #171a21;
+            --panel-border: #2a2f3a;
+            --text: #e6e8ec;
+            --muted: #9aa2af;
+            --accent: #4f8cff;
+            --good: #2fbf71;
+            --bad: #e5484d;
+            --warn: #e0a326;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 24px 16px 80px;
+        }
+
+        main {
+            width: 100%;
+            max-width: 720px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        h1 { font-size: 20px; margin: 0 0 4px; }
+        p.sub { margin: 0; color: var(--muted); font-size: 14px; }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .card h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+            margin: 0 0 12px;
+        }
+
+        .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: transparent;
+            border: 1px solid var(--panel-border);
+            color: var(--text);
+        }
+
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .video-wrap {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: black;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transform: scaleX(-1);
+        }
+
+        .face-guide {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .face-guide svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .face-guide ellipse {
+            fill: none;
+            stroke: rgba(255,255,255,0.55);
+            stroke-width: 2.5;
+            stroke-dasharray: 8 6;
+            transition: stroke 0.3s, stroke-width 0.3s;
+        }
+
+        .face-guide.good ellipse { stroke: var(--good); stroke-width: 3; stroke-dasharray: none; }
+        .face-guide.warn ellipse { stroke: var(--warn); stroke-width: 3; }
+
+        .dim-overlay {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 38% 52% at 50% 46%, transparent 99%, rgba(0,0,0,0.55) 100%);
+            pointer-events: none;
+        }
+
+        .progress-bar {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            display: none;
+            gap: 6px;
+            z-index: 2;
+        }
+
+        .progress-bar.show { display: flex; }
+
+        .progress-dot {
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.25);
+            transition: background 0.3s;
+        }
+
+        .progress-dot.done { background: var(--good); }
+        .progress-dot.active { background: var(--accent); }
+
+        .success-flash {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(47, 191, 113, 0.25);
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .success-flash.show {
+            display: flex;
+            animation: flashIn 0.4s ease;
+        }
+
+        .success-flash span {
+            background: var(--good);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 12px 24px;
+            border-radius: 999px;
+        }
+
+        @keyframes flashIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 16px 14px;
+            background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+            text-align: center;
+            z-index: 2;
+        }
+
+        .overlay .phase-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .overlay .challenge-text {
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .overlay small {
+            display: block;
+            font-weight: 400;
+            font-size: 13px;
+            color: #d8dbe2;
+            margin-top: 6px;
+        }
+
+        .ref-row { display: flex; gap: 16px; align-items: center; }
+
+        .ref-thumb {
+            width: 96px;
+            height: 96px;
+            border-radius: 8px;
+            background: #000 center/cover no-repeat;
+            border: 1px solid var(--panel-border);
+            flex-shrink: 0;
+        }
+
+        #log {
+            max-height: 160px;
+            overflow-y: auto;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--muted);
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        #log .ok { color: var(--good); }
+        #log .warn { color: var(--warn); }
+        #log .err { color: var(--bad); }
+
+        .result { display: none; text-align: center; padding: 24px 16px; }
+        .result.show { display: block; }
+        .result.success { border-color: var(--good); }
+        .result.failure { border-color: var(--bad); }
+
+        .result h2 {
+            font-size: 22px;
+            margin: 0 0 8px;
+            color: var(--text);
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .result.success h2 { color: var(--good); }
+        .result.failure h2 { color: var(--bad); }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>Liveness Detection .NET</h1>
+            <p class="sub">Verifikasi wajah real-time dengan challenge interaktif</p>
+        </header>
+
+        <section class="card">
+            <h2>1. Kamera</h2>
+            <div class="video-wrap">
+                <video id="video" autoplay playsinline muted></video>
+                <div class="dim-overlay"></div>
+                <div class="face-guide" id="faceGuide">
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <ellipse cx="50" cy="46" rx="22" ry="30" />
+                    </svg>
+                </div>
+                <div class="progress-bar" id="progressBar"></div>
+                <div class="success-flash" id="successFlash"><span>✓ Berhasil</span></div>
+                <div class="overlay" id="overlay">
+                    <div class="phase-label" id="phaseLabel"></div>
+                    <div class="challenge-text" id="challengeText">Aktifkan kamera untuk memulai</div>
+                    <small id="challengeSub"></small>
+                </div>
+            </div>
+            <div class="row" style="margin-top:12px;">
+                <button id="btnStartCam">Aktifkan Kamera</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>2. Foto Referensi</h2>
+            <div class="ref-row">
+                <div class="ref-thumb" id="refThumb"></div>
+                <div class="row">
+                    <button id="btnCaptureRef" class="secondary" disabled>Ambil dari Kamera</button>
+                    <label class="secondary" style="border:1px solid var(--panel-border); border-radius:8px; padding:10px 16px; cursor:pointer;">
+                        Upload File
+                        <input id="refFile" type="file" accept="image/*" style="display:none;" />
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>3. Verifikasi</h2>
+            <div class="row">
+                <button id="btnStart" disabled>Mulai Verifikasi</button>
+                <button id="btnStop" class="secondary" disabled>Hentikan</button>
+                <button id="btnReset" class="secondary">Reset</button>
+            </div>
+        </section>
+
+        <section class="card result" id="resultCard">
+            <h2 id="resultTitle">-</h2>
+            <p id="resultDetail" class="sub"></p>
+        </section>
+
+        <section class="card">
+            <h2>Log</h2>
+            <div id="log"></div>
+        </section>
+    </main>
+
+    <script>
+        const PHASE_LABELS = {
+            Calibrating: 'Persiapan',
+            Challenge: 'Langkah',
+            ChallengeRetry: 'Coba Lagi',
+            ReturnToNeutral: 'Istirahat',
+            Verifying: 'Verifikasi',
+            Complete: 'Selesai',
+            Failed: 'Gagal',
+        };
+
+        const CHALLENGE_LABELS = {
+            Blink: 'Kedipkan mata Anda',
+            Smile: 'Berikan senyuman lebar',
+            LookLeft: 'Tolehkan kepala ke kiri',
+            LookRight: 'Tolehkan kepala ke kanan',
+        };
+
+        const FRAME_INTERVAL_MS = 100;
+        const SUCCESS_FLASH_MS = 500;
+        const JPEG_QUALITY = 0.8;
+
+        const els = {
+            video: document.getElementById('video'),
+            overlay: document.getElementById('overlay'),
+            phaseLabel: document.getElementById('phaseLabel'),
+            challengeText: document.getElementById('challengeText'),
+            challengeSub: document.getElementById('challengeSub'),
+            faceGuide: document.getElementById('faceGuide'),
+            progressBar: document.getElementById('progressBar'),
+            successFlash: document.getElementById('successFlash'),
+            btnStartCam: document.getElementById('btnStartCam'),
+            btnCaptureRef: document.getElementById('btnCaptureRef'),
+            refFile: document.getElementById('refFile'),
+            refThumb: document.getElementById('refThumb'),
+            btnStart: document.getElementById('btnStart'),
+            btnStop: document.getElementById('btnStop'),
+            btnReset: document.getElementById('btnReset'),
+            resultCard: document.getElementById('resultCard'),
+            resultTitle: document.getElementById('resultTitle'),
+            resultDetail: document.getElementById('resultDetail'),
+            log: document.getElementById('log'),
+        };
+
+        const state = {
+            stream: null,
+            referenceDataUrl: null,
+            sessionId: null,
+            timerId: null,
+            busy: false,
+            challengeTotal: 0,
+            pausedUntil: 0,
+        };
+
+        function log(message, level) {
+            const line = document.createElement('div');
+            line.className = level || '';
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            els.log.prepend(line);
+        }
+
+        function captureFrameDataUrl() {
+            const canvas = document.createElement('canvas');
+            canvas.width = els.video.videoWidth;
+            canvas.height = els.video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(els.video, 0, 0);
+            return canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+        }
+
+        function buildProgressBar(total) {
+            if (total === state.challengeTotal && els.progressBar.childElementCount === total) return;
+            els.progressBar.innerHTML = '';
+            for (let i = 0; i < total; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'progress-dot';
+                els.progressBar.appendChild(dot);
+            }
+        }
+
+        function updateProgress(index, total, uiPhase) {
+            if (!total) {
+                els.progressBar.classList.remove('show');
+                return;
+            }
+            els.progressBar.classList.add('show');
+            const dots = els.progressBar.querySelectorAll('.progress-dot');
+            dots.forEach((dot, i) => {
+                dot.classList.remove('done', 'active');
+                if (i < index) dot.classList.add('done');
+                else if (i === index && uiPhase === 'Challenge') dot.classList.add('active');
+                else if (i === index && (uiPhase === 'ChallengeRetry' || uiPhase === 'ReturnToNeutral')) dot.classList.add('active');
+            });
+        }
+
+        function setFaceGuide(mode) {
+            els.faceGuide.classList.remove('good', 'warn');
+            if (mode) els.faceGuide.classList.add(mode);
+        }
+
+        function showSuccessFlash() {
+            els.successFlash.classList.add('show');
+            state.pausedUntil = Date.now() + SUCCESS_FLASH_MS;
+            setTimeout(() => els.successFlash.classList.remove('show'), SUCCESS_FLASH_MS);
+        }
+
+        function updateUi(data) {
+            const phase = data.uiPhase || '';
+            const instruction = data.instruction || data.message || '';
+            const total = data.challengeTotal || state.challengeTotal;
+            const index = data.challengeIndex ?? 0;
+
+            if (total) state.challengeTotal = total;
+            buildProgressBar(total);
+            updateProgress(index, total, phase);
+
+            els.phaseLabel.textContent = PHASE_LABELS[phase] || '';
+            els.challengeText.textContent = instruction;
+
+            if (phase === 'Calibrating') {
+                els.challengeSub.textContent = data.facePositionHint || 'Posisikan wajah di dalam lingkaran';
+                setFaceGuide(data.facePositionHint ? 'warn' : 'good');
+            } else if (phase === 'ReturnToNeutral') {
+                els.challengeSub.textContent = 'Sebentar, kembali ke posisi lurus';
+                setFaceGuide('');
+            } else if (phase === 'Verifying') {
+                els.challengeSub.textContent = 'Jangan bergerak';
+                setFaceGuide('good');
+            } else if (phase === 'Challenge' || phase === 'ChallengeRetry') {
+                const label = CHALLENGE_LABELS[data.currentChallenge] || '';
+                els.challengeSub.textContent = phase === 'ChallengeRetry'
+                    ? `Percobaan tersisa: ${data.retriesRemaining ?? 0}`
+                    : label ? `${index + 1} dari ${total}` : '';
+                setFaceGuide('');
+            } else if (phase === 'Complete') {
+                els.challengeSub.textContent = '';
+                setFaceGuide('good');
+            } else if (phase === 'Failed') {
+                els.challengeSub.textContent = '';
+                setFaceGuide('');
+            } else {
+                els.challengeSub.textContent = '';
+            }
+        }
+
+        function showResult(kind, title, detail) {
+            els.resultCard.className = `card result show ${kind}`;
+            els.resultTitle.textContent = title;
+            els.resultDetail.textContent = detail || '';
+        }
+
+        function hideResult() {
+            els.resultCard.className = 'card result';
+        }
+
+        async function startCamera() {
+            try {
+                state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                els.video.srcObject = state.stream;
+                els.btnStartCam.disabled = true;
+                els.btnStartCam.textContent = 'Kamera Aktif';
+                els.btnCaptureRef.disabled = false;
+                els.challengeText.textContent = 'Ambil foto referensi, lalu mulai verifikasi';
+                log('Kamera aktif.', 'ok');
+            } catch (err) {
+                log('Gagal mengakses kamera: ' + err.message, 'err');
+            }
+        }
+
+        function setReferenceFromDataUrl(dataUrl) {
+            state.referenceDataUrl = dataUrl;
+            els.refThumb.style.backgroundImage = `url(${dataUrl})`;
+            els.btnStart.disabled = false;
+            log('Foto referensi siap.', 'ok');
+        }
+
+        function fileToDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function startSession() {
+            hideResult();
+            els.btnStart.disabled = true;
+            try {
+                const res = await fetch('/api/liveness/session/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ referenceImageBase64: state.referenceDataUrl }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    log('Gagal memulai sesi: ' + (data.error || res.status), 'err');
+                    els.btnStart.disabled = false;
+                    return;
+                }
+                state.sessionId = data.sessionId;
+                state.challengeTotal = data.challengeTotal;
+                log(`Sesi dimulai (${data.challengeTotal} langkah).`, 'ok');
+                updateUi(data);
+                els.btnStop.disabled = false;
+                startLoop();
+            } catch (err) {
+                log('Network error: ' + err.message, 'err');
+                els.btnStart.disabled = false;
+            }
+        }
+
+        function startLoop() {
+            stopLoop(false);
+            state.timerId = setInterval(submitFrame, FRAME_INTERVAL_MS);
+        }
+
+        function stopLoop(disableBtn = true) {
+            if (state.timerId) {
+                clearInterval(state.timerId);
+                state.timerId = null;
+            }
+            if (disableBtn) els.btnStop.disabled = true;
+        }
+
+        async function submitFrame() {
+            if (state.busy || !state.sessionId || Date.now() < state.pausedUntil) return;
+            state.busy = true;
+            try {
+                const res = await fetch(`/api/liveness/session/${state.sessionId}/frame`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imageBase64: captureFrameDataUrl() }),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    log(data.error || `HTTP ${res.status}`, 'warn');
+                    return;
+                }
+
+                if (data.challengeJustPassed) showSuccessFlash();
+                updateUi(data);
+                log(`${data.uiPhase || data.status}: ${data.message}`);
+
+                if (data.status === 'Success') {
+                    stopLoop();
+                    const pct = data.similarity != null ? (data.similarity * 100).toFixed(1) + '%' : '-';
+                    updateUi({ ...data, uiPhase: 'Complete', instruction: 'Verifikasi berhasil!' });
+                    showResult('success', 'Verifikasi Berhasil', `Kemiripan wajah: ${pct}`);
+                } else if (data.status === 'Failed' || data.status === 'Expired') {
+                    stopLoop();
+                    updateUi({ ...data, uiPhase: 'Failed', instruction: data.message });
+                    if (data.failedChallenges?.length) {
+                        const labels = data.failedChallenges.map(c => CHALLENGE_LABELS[c] || c);
+                        log(`Challenge gagal: ${labels.join(', ')}`, 'err');
+                    }
+                    showResult('failure', data.status === 'Expired' ? 'Sesi Kedaluwarsa' : 'Verifikasi Gagal', data.message);
+                }
+            } catch (err) {
+                log('Network error: ' + err.message, 'err');
+            } finally {
+                state.busy = false;
+            }
+        }
+
+        function resetAll() {
+            stopLoop();
+            state.sessionId = null;
+            state.challengeTotal = 0;
+            state.pausedUntil = 0;
+            els.btnStart.disabled = !state.referenceDataUrl;
+            els.progressBar.classList.remove('show');
+            els.challengeText.textContent = 'Aktifkan kamera untuk memulai';
+            els.challengeSub.textContent = '';
+            els.phaseLabel.textContent = '';
+            setFaceGuide('');
+            hideResult();
+            log('Direset.');
+        }
+
+        els.btnStartCam.addEventListener('click', startCamera);
+        els.btnCaptureRef.addEventListener('click', () => setReferenceFromDataUrl(captureFrameDataUrl()));
+        els.refFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) setReferenceFromDataUrl(await fileToDataUrl(file));
+        });
+        els.btnStart.addEventListener('click', startSession);
+        els.btnStop.addEventListener('click', () => { stopLoop(); log('Dihentikan.', 'warn'); });
+        els.btnReset.addEventListener('click', resetAll);
+    </script>
+</body>
+</html>

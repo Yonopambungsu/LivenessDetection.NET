@@ -9,12 +9,6 @@ using SmileDetector = LivenessAPI.Infrastructure.Smile.SmileDetector;
 
 namespace LivenessAPI.Infrastructure.ChallengeEngine;
 
-/// <summary>
-/// Dispatches the currently active challenge to its geometric check and drives the small per-session
-/// state machine needed to confirm an *action* happened across frames (not just a static pose).
-/// Reuses LivenessSession.MetricHistory/ChallengeArmed as scratch state; both are cleared by the
-/// caller (LivenessSessionService) whenever a challenge is passed and the next one begins.
-/// </summary>
 public sealed class ChallengeEngineImpl(IOptions<LivenessOptions> options) : IChallengeEngine
 {
     private readonly LivenessOptions _options = options.Value;
@@ -24,40 +18,31 @@ public sealed class ChallengeEngineImpl(IOptions<LivenessOptions> options) : ICh
         return type switch
         {
             ChallengeType.Blink => EvaluateBlink(landmarks, session),
-            ChallengeType.Smile => EvaluateHold("smile", SmileDetector.MouthRatio(landmarks), _options.SmileRatioThreshold, above: true, session),
-            ChallengeType.LookLeft => EvaluateHold("yaw", HeadPoseEstimator.YawOffset(landmarks), _options.YawOffsetThreshold, above: true, session),
-            ChallengeType.LookRight => EvaluateHold("yaw", HeadPoseEstimator.YawOffset(landmarks), -_options.YawOffsetThreshold, above: false, session),
+            ChallengeType.Smile => EvaluateSmile(SmileDetector.MouthRatio(landmarks), session),
+            ChallengeType.LookLeft => EvaluateYaw(landmarks, turnLeft: true, session),
+            ChallengeType.LookRight => EvaluateYaw(landmarks, turnLeft: false, session),
             _ => new ChallengeEvaluation(false),
         };
     }
 
-    /// <summary>
-    /// Blink = a relative dip-then-recover in eye-openness, not a fixed absolute EAR value. A fixed
-    /// threshold depends on the eye landmark points being exactly right, which we can't guarantee
-    /// (see the TODO on Landmark106Indices) — a wrong index mapping means the "eyes open" baseline
-    /// might never cross a hardcoded threshold, getting the challenge permanently stuck. Instead we
-    /// track the highest EAR seen so far this attempt as a rolling baseline (session.MetricHistory[0]),
-    /// and call it a blink as soon as the EAR drops well below that baseline and then recovers close to
-    /// it again — works regardless of what the absolute EAR numbers happen to be for this model.
-    /// </summary>
+    private float MeasureYaw(PointF[] landmarks) =>
+        HeadPoseEstimator.YawOffset(landmarks, _options.InvertYawSign);
+
     private ChallengeEvaluation EvaluateBlink(PointF[] landmarks, LivenessSession session)
     {
         float ear = BlinkDetector.EyeAspectRatio(landmarks);
 
         if (session.MetricHistory.Count == 0)
         {
-            // First frame of the attempt: seed the baseline from whatever we see (assumed roughly open).
             session.MetricHistory.Add(ear);
             session.ChallengeArmed = false;
-            return new ChallengeEvaluation(false, ($"ear={ear:F3} (calibrating)"));
+            return new ChallengeEvaluation(false, $"ear={ear:F3} (calibrating)");
         }
 
         float baseline = session.MetricHistory[0];
 
         if (!session.ChallengeArmed)
         {
-            // Still tracking the "eyes open" baseline upward; also catches a dip if the user blinks
-            // before the baseline has settled, so an early blink isn't missed.
             if (ear > baseline)
             {
                 session.MetricHistory[0] = ear;
@@ -65,37 +50,126 @@ public sealed class ChallengeEngineImpl(IOptions<LivenessOptions> options) : ICh
             }
             else if (ear < baseline * _options.BlinkClosedRatio)
             {
-                session.ChallengeArmed = true; // dip observed, now waiting for recovery
+                session.ChallengeArmed = true;
             }
 
-            return new ChallengeEvaluation(false, ($"ear={ear:F3} baseline={baseline:F3}"));
+            return new ChallengeEvaluation(false, $"ear={ear:F3} baseline={baseline:F3}");
         }
 
-        // Dip already observed; pass as soon as EAR recovers back toward the open baseline.
         if (ear > baseline * _options.BlinkRecoverRatio)
         {
-            return new ChallengeEvaluation(true, ($"ear={ear:F3} baseline={baseline:F3} (blink confirmed)"));
+            session.MetricHistory.Add(ear);
+        }
+        else if (session.MetricHistory.Count > 1)
+        {
+            session.MetricHistory.RemoveRange(1, session.MetricHistory.Count - 1);
         }
 
-        return new ChallengeEvaluation(false, ($"ear={ear:F3} baseline={baseline:F3} (waiting for eyes to reopen)"));
+        int recoveryHold = Math.Max(0, session.MetricHistory.Count - 1);
+        if (recoveryHold >= _options.BlinkRequiredConsecutiveFrames)
+        {
+            return new ChallengeEvaluation(true, $"ear={ear:F3} baseline={baseline:F3} (blink confirmed)");
+        }
+
+        return new ChallengeEvaluation(false, $"ear={ear:F3} baseline={baseline:F3} reopenHold={recoveryHold}/{_options.BlinkRequiredConsecutiveFrames}");
     }
 
-    /// <summary>Generic "metric crosses threshold and stays there for a few frames" check, used for
-    /// smile and head-turn challenges where there's no natural open/closed cycle to look for.</summary>
-    private ChallengeEvaluation EvaluateHold(string label, float metric, float threshold, bool above, LivenessSession session)
+    /// <summary>Smile is measured as an increase in mouth ratio from a personal resting baseline captured
+    /// over the first few frames, not a fixed absolute threshold — avoids failing users whose resting
+    /// mouth is naturally wider than average.</summary>
+    private ChallengeEvaluation EvaluateSmile(float mouthRatio, LivenessSession session)
     {
-        bool satisfied = above ? metric > threshold : metric < threshold;
+        if (!session.ChallengeArmed)
+        {
+            if (session.MetricHistory.Count == 0)
+            {
+                session.MetricHistory.Add(mouthRatio);
+                session.WrongHoldCount = 1;
+                return new ChallengeEvaluation(false, $"smile={mouthRatio:F3} (calibrating resting mouth)");
+            }
+
+            float baseline = session.MetricHistory[0];
+            if (mouthRatio < baseline)
+            {
+                session.MetricHistory[0] = mouthRatio;
+                baseline = mouthRatio;
+            }
+
+            session.WrongHoldCount++;
+            if (session.WrongHoldCount >= _options.SmileCalibrationFrames)
+            {
+                session.ChallengeArmed = true;
+                session.WrongHoldCount = 0;
+            }
+
+            return new ChallengeEvaluation(false,
+                $"smile={mouthRatio:F3} baseline={baseline:F3} calFrames={session.WrongHoldCount}/{_options.SmileCalibrationFrames}");
+        }
+
+        float restingBaseline = session.MetricHistory[0];
+        float smileThreshold = restingBaseline + _options.SmileDeltaThreshold;
+        bool satisfied = mouthRatio > smileThreshold;
 
         if (satisfied)
         {
-            session.MetricHistory.Add(metric);
+            session.MetricHistory.Add(mouthRatio);
+        }
+        else if (session.MetricHistory.Count > 1)
+        {
+            session.MetricHistory.RemoveRange(1, session.MetricHistory.Count - 1);
+        }
+
+        int hold = Math.Max(0, session.MetricHistory.Count - 1);
+        bool passed = hold >= _options.SmileRequiredConsecutiveFrames;
+        return new ChallengeEvaluation(passed,
+            $"smile={mouthRatio:F3} baseline={restingBaseline:F3} threshold={smileThreshold:F3} hold={hold}/{_options.SmileRequiredConsecutiveFrames}");
+    }
+
+    private ChallengeEvaluation EvaluateYaw(PointF[] landmarks, bool turnLeft, LivenessSession session)
+    {
+        float yaw = MeasureYaw(landmarks);
+        float threshold = _options.YawOffsetThreshold;
+        int holdRequired = _options.YawRequiredConsecutiveFrames;
+
+        if (!session.ChallengeArmed)
+        {
+            if (HeadPoseEstimator.IsNearNeutral(yaw, session.NeutralYawBaseline, _options.YawNeutralThreshold))
+            {
+                session.ChallengeArmed = true;
+                session.YawChallengeBaseline = yaw;
+            }
+
+            return new ChallengeEvaluation(false,
+                $"yaw={yaw:F3} neutral={session.NeutralYawBaseline:F3} (waiting for neutral pose before starting)");
+        }
+
+        float baseline = session.YawChallengeBaseline ?? session.NeutralYawBaseline;
+        float delta = yaw - baseline;
+
+        bool satisfied = turnLeft ? delta > threshold : delta < -threshold;
+        bool wrongDirection = turnLeft ? delta < -threshold : delta > threshold;
+
+        if (satisfied)
+        {
+            session.MetricHistory.Add(delta);
+            session.WrongHoldCount = 0;
+        }
+        else if (wrongDirection)
+        {
+            session.WrongHoldCount++;
+            session.MetricHistory.Clear();
         }
         else
         {
             session.MetricHistory.Clear();
+            session.WrongHoldCount = 0;
         }
 
-        bool passed = session.MetricHistory.Count >= _options.RequiredConsecutiveFrames;
-        return new ChallengeEvaluation(passed, ($"{label}={metric:F3} threshold={threshold:F3} hold={session.MetricHistory.Count}/{_options.RequiredConsecutiveFrames}"));
+        bool passed = session.MetricHistory.Count >= holdRequired;
+        bool wrongConfirmed = session.WrongHoldCount >= holdRequired;
+        return new ChallengeEvaluation(
+            passed,
+            $"yaw={yaw:F3} delta={delta:F3} threshold=±{threshold:F3} hold={session.MetricHistory.Count}/{holdRequired} wrongHold={session.WrongHoldCount}/{holdRequired}",
+            WrongGesture: wrongConfirmed);
     }
 }

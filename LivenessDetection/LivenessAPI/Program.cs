@@ -58,7 +58,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseDefaultFiles();
+app.UseDefaultFiles(new DefaultFilesOptions
+{
+    DefaultFileNames = { "liveness-detection.html" }
+});
 app.UseStaticFiles();
 
 app.UseCors(CorsPolicy);
@@ -74,7 +77,7 @@ static string ResolveModelPath(IServiceProvider sp, Func<LivenessOptions, string
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<LivenessOptions>>().Value;
     var env = sp.GetRequiredService<IWebHostEnvironment>();
     var relative = selector(options);
-    var resolved = Path.GetFullPath(Path.Combine(env.ContentRootPath, relative));
+    var resolved = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relative));
 
     if (!File.Exists(resolved))
     {
