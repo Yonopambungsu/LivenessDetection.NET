@@ -99,7 +99,9 @@ public sealed class LivenessOptions
     /// too tight a value here reads as the challenge never starting.</summary>
     public float YawNeutralThreshold { get; set; } = 0.10f;
 
-    public int SessionTtlSeconds { get; set; } = 120;
+    /// <summary>Idle timeout in seconds. Extended (sliding) on every submitted frame so an active
+    /// verification is not cut off while the user is still participating.</summary>
+    public int SessionTtlSeconds { get; set; } = 300;
 
     public int ChallengeCount { get; set; } = 3;
 

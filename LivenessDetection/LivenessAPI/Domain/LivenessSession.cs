@@ -13,7 +13,7 @@ public sealed class LivenessSession
     public LivenessStatus Status { get; set; } = LivenessStatus.Calibrating;
     public string? FailureReason { get; set; }
     public required DateTimeOffset CreatedAt { get; init; }
-    public required DateTimeOffset ExpiresAt { get; init; }
+    public required DateTimeOffset ExpiresAt { get; set; }
 
     /// <summary>Rolling metric history (EAR / mouth-ratio / yaw-offset) for the currently active challenge.</summary>
     public List<float> MetricHistory { get; } = new();

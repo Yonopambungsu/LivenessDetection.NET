@@ -23,7 +23,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.Configure<LivenessOptions>(builder.Configuration.GetSection(LivenessOptions.SectionName));
-builder.Services.AddMemoryCache();
 
 // Dev-permissive CORS so a browser-based camera client on a different origin can call the API.
 // Tighten this (named origins, no AllowAnyHeader) before deploying anywhere public.

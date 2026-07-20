@@ -94,6 +94,10 @@ public sealed class LivenessSessionService(
     {
         var session = store.Get(sessionId) ?? throw new LivenessSessionNotFoundException(sessionId);
 
+        // Sliding expiration: extend the deadline on every frame so slow calibration, ONNX cold
+        // start, and user hesitation do not expire an otherwise active session.
+        session.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(_options.SessionTtlSeconds);
+
         if (IsFinished(session.Status))
         {
             return Respond(session, $"Session already finished with status {session.Status}.");

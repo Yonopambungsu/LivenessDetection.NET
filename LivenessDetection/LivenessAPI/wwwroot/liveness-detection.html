@@ -557,6 +557,13 @@
 
                 if (!res.ok) {
                     log(data.error || `HTTP ${res.status}`, 'warn');
+                    if (res.status === 404) {
+                        stopLoop();
+                        state.sessionId = null;
+                        els.btnStart.disabled = !state.referenceDataUrl;
+                        updateUi({ uiPhase: 'Failed', instruction: 'Sesi berakhir. Mulai ulang verifikasi.' });
+                        showResult('failure', 'Sesi Berakhir', data.error || 'Sesi tidak ditemukan atau kedaluwarsa. Silakan klik Mulai Verifikasi lagi.');
+                    }
                     return;
                 }
 
