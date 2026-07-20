@@ -7,9 +7,9 @@ public sealed class LivenessOptions
 {
     public const string SectionName = "Liveness";
 
-    public string ScrfdModelPath { get; set; } = "../detection/scrfd_10g_bnkps.onnx";
-    public string LandmarkModelPath { get; set; } = "../landmark/2d106det.onnx";
-    public string RecognitionModelPath { get; set; } = "../recognition/glintr100.onnx";
+    public string YunetModelPath { get; set; } = "../detection/face_detection_yunet.onnx";
+    public string LandmarkModelPath { get; set; } = "../landmark/pipnet_r18_300w_celeba_68.onnx";
+    public string RecognitionModelPath { get; set; } = "../recognition/glintr100-aura-face.onnx";
     public string AntiSpoofModelPath { get; set; } = "../spoof/MiniFASNetV2.onnx";
 
     public int DetectionInputSize { get; set; } = 320;

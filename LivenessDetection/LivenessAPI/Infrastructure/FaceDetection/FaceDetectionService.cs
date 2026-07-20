@@ -7,7 +7,7 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace LivenessAPI.Infrastructure.FaceDetection;
 
-public sealed class FaceDetectionService(ScrfdDetector detector, IOptions<LivenessOptions> options) : IFaceDetectionService
+public sealed class FaceDetectionService(YunetDetector detector, IOptions<LivenessOptions> options) : IFaceDetectionService
 {
     private readonly LivenessOptions _options = options.Value;
 

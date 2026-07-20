@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -16,13 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="detection\scrfd_10g_bnkps.onnx">
+    <None Update="detection\face_detection_yunet.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="landmark\2d106det.onnx">
+    <None Update="landmark\pipnet_r18_300w_celeba_68.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="recognition\glintr100.onnx">
+    <None Update="recognition\glintr100-aura-face.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="spoof\MiniFASNetV2.onnx">

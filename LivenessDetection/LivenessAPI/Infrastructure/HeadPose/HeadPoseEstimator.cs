@@ -6,16 +6,16 @@ namespace LivenessAPI.Infrastructure.HeadPose;
 /// <summary>
 /// Cheap yaw proxy: horizontal offset of the nose tip from the midpoint between the outer eye
 /// corners, normalized by inter-eye distance. Landmark "left"/"right" follow image coordinates
-/// (see Landmark106Indices). Pass invertSign=true when the client mirrors frames before upload so
+/// (see Landmark68Indices). Pass invertSign=true when the client mirrors frames before upload so
 /// "turn left" on a selfie preview produces a positive delta from baseline.
 /// </summary>
 public static class HeadPoseEstimator
 {
     public static float YawOffset(PointF[] landmarks, bool invertSign = false)
     {
-        var leftEye = landmarks[Landmark106Indices.LeftEyeLeftCorner];
-        var rightEye = landmarks[Landmark106Indices.RightEyeRightCorner];
-        var nose = landmarks[Landmark106Indices.NoseTip];
+        var leftEye  = landmarks[Landmark68Indices.LeftEyeLeftCorner];
+        var rightEye = landmarks[Landmark68Indices.RightEyeRightCorner];
+        var nose     = landmarks[Landmark68Indices.NoseTip];
 
         float eyeMidX = (leftEye.X + rightEye.X) / 2f;
         float eyeDistance = MathF.Max(MathF.Abs(rightEye.X - leftEye.X), 1e-3f);

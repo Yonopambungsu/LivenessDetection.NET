@@ -34,8 +34,8 @@ builder.Services.AddCors(options =>
 
 // ONNX-backed detectors: each wraps a single InferenceSession and is safe to share as a singleton
 // (ONNX Runtime's Run() is thread-safe for concurrent calls on the same session).
-builder.Services.AddSingleton(sp => new ScrfdDetector(ResolveModelPath(sp, o => o.ScrfdModelPath)));
-builder.Services.AddSingleton(sp => new Landmark106Detector(ResolveModelPath(sp, o => o.LandmarkModelPath)));
+builder.Services.AddSingleton(sp => new YunetDetector(ResolveModelPath(sp, o => o.YunetModelPath)));
+builder.Services.AddSingleton(sp => new Pipnet68Detector(ResolveModelPath(sp, o => o.LandmarkModelPath)));
 builder.Services.AddSingleton(sp => new ArcFaceRecognizer(ResolveModelPath(sp, o => o.RecognitionModelPath)));
 builder.Services.AddSingleton(sp => new AntiSpoofDetector(ResolveModelPath(sp, o => o.AntiSpoofModelPath)));
 

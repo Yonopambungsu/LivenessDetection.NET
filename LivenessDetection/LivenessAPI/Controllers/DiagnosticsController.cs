@@ -16,12 +16,12 @@ public sealed record AntiSpoofVariant(string Normalization, bool SwapToBgr, floa
 
 /// <summary>
 /// Not part of the liveness flow itself — a calibration aid for verifying/correcting
-/// Landmark106Indices and the AntiSpoofDetector's crop-scale/real-class-index assumptions (see the
+/// Landmark68Indices and the AntiSpoofDetector's crop-scale/real-class-index assumptions (see the
 /// TODOs there) against real photos, since neither could be confirmed from documentation alone.
 /// </summary>
 [ApiController]
 [Route("api/liveness/debug")]
-public sealed class DiagnosticsController(ScrfdDetector detector, Landmark106Detector landmarkDetector, AntiSpoofDetector antiSpoofDetector) : ControllerBase
+public sealed class DiagnosticsController(YunetDetector detector, Pipnet68Detector landmarkDetector, AntiSpoofDetector antiSpoofDetector) : ControllerBase
 {
     public sealed record DebugRequest(string ImageBase64);
 
