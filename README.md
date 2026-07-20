@@ -18,13 +18,13 @@ Place the models as follows:
 ```
 AIModels/
 ├── detection/
-│   └── scrfd_10g_bnkps.onnx
+│   └── face_detection_yunet.onnx
 │
 ├── landmark/
-│   └── 2d106det.onnx
+│   └── pipnet_r18_300w_celeba_68.onnx
 │
 ├── recognition/
-│   └── glintr100.onnx
+│   └── glintr100-aura-face.onnx
 │
 └── spoof/
     └── MiniFASNetV2.onnx
@@ -46,17 +46,18 @@ After downloading the models, your project structure should look like this:
 ```
 AIModels/
 ├── detection/
-│   ├── ScrfdDetector.cs
+│   ├── YunetDetector.cs
 │   ├── DetectedFace.cs
-│   └── scrfd_10g_bnkps.onnx
+│   └── face_detection_yunet.onnx
 │
 ├── landmark/
-│   ├── Landmark106Detector.cs
-│   └── 2d106det.onnx
+│   ├── Landmark68Indices.cs
+│   └── pipnet_r18_300w_celeba_68.onnx
+|   └── Pipnet68Detector.cs
 │
 ├── recognition/
 │   ├── ArcFaceRecognizer.cs
-│   └── glintr100.onnx
+│   └── glintr100-aura-face.onnx
 │
 ├── spoof/
 │   ├── AntiSpoofDetector.cs
