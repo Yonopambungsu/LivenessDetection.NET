@@ -1,8 +1,9 @@
 namespace LivenessAPI.Domain;
 
 /// <summary>
-/// Server-side state for one liveness attempt. Held in-memory (see MemoryLivenessSessionStore) and
-/// mutated in place as frames are submitted.
+/// Server-side state for one liveness attempt. Persisted to disk as JSON (see FileLivenessSessionStore
+/// - a shared-hosting worker process can be recycled at any time, so in-memory-only storage isn't
+/// reliable) and mutated in place as frames are submitted.
 /// </summary>
 public sealed class LivenessSession
 {
@@ -15,8 +16,11 @@ public sealed class LivenessSession
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset ExpiresAt { get; set; }
 
-    /// <summary>Rolling metric history (EAR / mouth-ratio / yaw-offset) for the currently active challenge.</summary>
-    public List<float> MetricHistory { get; } = new();
+    /// <summary>Rolling metric history (EAR / mouth-ratio / yaw-offset) for the currently active challenge.
+    /// Has a setter (not just get-only) so JSON deserialization can assign it directly - System.Text.Json
+    /// does not repopulate a get-only collection property by default, it would otherwise silently come
+    /// back empty every time a session is reloaded from disk.</summary>
+    public List<float> MetricHistory { get; set; } = new();
 
     /// <summary>True once the baseline state (eyes open / neutral yaw / resting mouth) has been observed.</summary>
     public bool ChallengeArmed { get; set; }
@@ -24,8 +28,9 @@ public sealed class LivenessSession
     /// <summary>Consecutive-frame counter for a clearly-wrong gesture on the active challenge.</summary>
     public int WrongHoldCount { get; set; }
 
-    /// <summary>Challenges that failed after all retries were exhausted.</summary>
-    public List<ChallengeType> FailedChallenges { get; } = new();
+    /// <summary>Challenges that failed after all retries were exhausted. Has a setter for the same
+    /// deserialization reason as MetricHistory above.</summary>
+    public List<ChallengeType> FailedChallenges { get; set; } = new();
 
     /// <summary>When the currently active challenge began; reset on retry and queue advance.</summary>
     public required DateTimeOffset ChallengeStartedAt { get; set; }

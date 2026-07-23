@@ -38,7 +38,7 @@ public sealed class LivenessOptions
     public string[] FixedChallengeOrder { get; set; } = ["Blink", "LookLeft", "LookRight", "Smile"];
 
     /// <summary>How many retries the user gets per challenge after a wrong gesture or timeout.</summary>
-    public int MaxRetriesPerChallenge { get; set; } = 1;
+    public int MaxRetriesPerChallenge { get; set; } = 2;
 
     /// <summary>Seconds the user must hold a good centered pose during initial calibration.</summary>
     public double CalibrationSeconds { get; set; } = 1.0;
@@ -67,8 +67,10 @@ public sealed class LivenessOptions
     public float BlinkRecoverRatio { get; set; } = 0.85f;
 
     /// <summary>Consecutive reopened-eye frames required to confirm a blink (lower than smile because
-    /// a blink is transient).</summary>
-    public int BlinkRequiredConsecutiveFrames { get; set; } = 2;
+    /// a blink is transient). Raised from an earlier 2 - a single noisy landmark frame near the
+    /// closed/recover ratio boundary could otherwise look like a full dip-then-recover blink cycle
+    /// even on a still, non-blinking face.</summary>
+    public int BlinkRequiredConsecutiveFrames { get; set; } = 3;
 
     /// <summary>Minimum mouth-ratio increase above the user's personal resting baseline to count as smiling.</summary>
     public float SmileDeltaThreshold { get; set; } = 0.06f;
@@ -76,8 +78,9 @@ public sealed class LivenessOptions
     /// <summary>Frames spent observing the resting mouth before the smile challenge starts counting.</summary>
     public int SmileCalibrationFrames { get; set; } = 3;
 
-    /// <summary>Consecutive frames required to confirm a smile hold.</summary>
-    public int SmileRequiredConsecutiveFrames { get; set; } = 2;
+    /// <summary>Consecutive frames required to confirm a smile hold. Raised from an earlier 2 - two
+    /// noisy mouth-ratio readings in a row were enough to falsely confirm a smile that never happened.</summary>
+    public int SmileRequiredConsecutiveFrames { get; set; } = 4;
 
     /// <summary>Legacy absolute threshold kept for reference; smile now uses resting baseline + SmileDeltaThreshold.</summary>
     public float SmileRatioThreshold { get; set; } = 0.38f;
@@ -86,9 +89,12 @@ public sealed class LivenessOptions
     /// Must be true when the client horizontally flips frames before upload (standard selfie UX).</summary>
     public bool InvertYawSign { get; set; } = true;
 
-    /// <summary>Consecutive frames required to confirm a head turn (lower than blink/smile because
-    /// users rarely hold a turn perfectly still).</summary>
-    public int YawRequiredConsecutiveFrames { get; set; } = 2;
+    /// <summary>Consecutive frames required to confirm a head turn - both for a genuine turn AND for a
+    /// confirmed wrong-direction turn (same bar, see ChallengeEngineImpl.EvaluateYaw). Raised from an
+    /// earlier 2: with YawOffsetThreshold/YawNeutralThreshold both at 0.10 (a small margin), ordinary
+    /// landmark jitter on an otherwise still face could cross that threshold for 2 frames by chance
+    /// alone, wrongly resolving the challenge (pass or fail) without the user actually turning.</summary>
+    public int YawRequiredConsecutiveFrames { get; set; } = 4;
 
     /// <summary>A LookLeft/LookRight challenge only starts counting hold-frames once the yaw has been seen
     /// within this distance of center first. Without this, a head turn left over from the previous challenge

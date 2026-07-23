@@ -43,7 +43,7 @@ builder.Services.AddSingleton<IFaceLandmarkService, FaceLandmarkService>();
 builder.Services.AddSingleton<IAntiSpoofService, AntiSpoofService>();
 builder.Services.AddSingleton<IFaceRecognitionService, FaceRecognitionServiceImpl>();
 builder.Services.AddSingleton<IChallengeEngine, ChallengeEngineImpl>();
-builder.Services.AddSingleton<ILivenessSessionStore, MemoryLivenessSessionStore>();
+builder.Services.AddSingleton<ILivenessSessionStore, FileLivenessSessionStore>();
 builder.Services.AddScoped<ILivenessSessionService, LivenessSessionService>();
 
 var app = builder.Build();

@@ -95,8 +95,14 @@ public sealed class LivenessSessionService(
         var session = store.Get(sessionId) ?? throw new LivenessSessionNotFoundException(sessionId);
 
         // Sliding expiration: extend the deadline on every frame so slow calibration, ONNX cold
-        // start, and user hesitation do not expire an otherwise active session.
+        // start, and user hesitation do not expire an otherwise active session. Persisted right away
+        // (not just mutated on the in-memory object) so it takes effect even on the code paths below
+        // that return early without their own store.Save() call - e.g. no face detected in this
+        // particular frame. Without this, a run of no-face-detected frames (flaky lighting, a stale
+        // camera frame, momentary occlusion) would silently stop refreshing the cached TTL until it
+        // finally lapsed, surfacing as "session not found or expired" instead of a normal timeout.
         session.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(_options.SessionTtlSeconds);
+        store.Save(session);
 
         if (IsFinished(session.Status))
         {
